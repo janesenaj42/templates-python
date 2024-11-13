@@ -1,0 +1,126 @@
+default:
+    tags:
+        - sample
+    image: my.repo/cimg/python:3.11.8
+
+include:
+  - project: infrastructure/gitlab-ci-templates
+    file:
+      - docker.yaml
+      - pip.yaml
+
+variables:
+    PROJECT_NAME: sample
+    MODULE_NAME: my-package
+    SRC_DIRECTORY: src
+    REPORTS_DIRECTORY: reports
+    PUBLISH_DOCKER_REGISTRY: my.repo
+
+stages:
+    - check
+    - build
+    - stage
+
+lint:
+    stage: check
+    extends:
+        - .pip
+    dependencies: []
+    variables:
+        PYLINT_REPORT: $REPORTS_DIRECTORY/pylint_report.txt
+        PYLINT_REPORT_JSON: $REPORTS_DIRECTORY/pylint_report.json
+    script:
+        - mkdir -p $REPORTS_DIRECTORY
+        - python -m pylint --output-format=parseable $SRC_DIRECTORY > $PYLINT_REPORT
+        - python -m pylint --output-format=json $SRC_DIRECTORY > $PYLINT_REPORT_JSON
+        - echo "Pylint done."
+    artifacts:
+        paths:
+            - $PYLINT_REPORT
+            - $PYLINT_REPORT_JSON
+
+radon:
+    stage: check
+    extends:
+        - .pip
+    dependencies: []
+    variables:
+        RADON_REPORT: $REPORTS_DIRECTORY/radon_report.txt
+        RADON_XML: $REPORTS_DIRECTORY/radon_report.xml
+    script:
+        - mkdir -p $REPORTS_DIRECTORY
+        - python -m radon cc $SRC_DIRECTORY > $RADON_REPORT
+        - python -m radon cc --xml --output-file $RADON_XML $SRC_DIRECTORY
+        - echo "Cyclomatic complexity done."
+    artifacts:
+        paths:
+            - $RADON_REPORT
+            - $RADON_XML
+
+test:
+    stage: check
+    extends:
+        - .pip
+    dependencies: []
+    script:
+        - mkdir -p $REPORTS_DIRECTORY
+        - cd $SRC_DIRECTORY
+        - python -m pytest ..
+        - echo "Pytest done."
+
+build:
+    stage: build
+    extends:
+        - .docker
+    dependencies: []
+    rules:
+        - if: $CI_COMMIT_TAG # tagged commits are for production
+          when: on_success
+          variables:
+            IMAGE_TAG: production
+        - if: $CI_COMMIT_BRANCH == $BRANCH_STAGING
+          when: on_success
+          variables:
+            IMAGE_TAG: latest
+        - when: never
+    variables:
+        DOCKER_IMAGE_NAME: $PUBLISH_DOCKER_REGISTRY/$PROJECT_NAME/$MODULE_NAME
+    script:
+        - echo $CI_COMMIT_BRANCH
+        - echo $CI_COMMIT_TAG
+        - echo $CI_COMMIT_REF_SLUG
+        - echo $CI_COMMIT_SHA
+        - docker build
+            --label org.opencontainers.image.revision=$CI_COMMIT_SHA
+            --label org.opencontainers.image.version=$CI_COMMIT_TAG
+            --label org.opencontainers.image.created=$(date +'%Y-%m-%dT%H:%M:%SZ')
+            -t $DOCKER_IMAGE_NAME:$IMAGE_TAG .
+        - docker push $DOCKER_IMAGE_NAME:$IMAGE_TAG
+        - if [ ! -z "$CI_COMMIT_TAG" ]; then docker tag $DOCKER_IMAGE_NAME:$IMAGE_TAG $DOCKER_IMAGE_NAME:$CI_COMMIT_TAG && docker push $DOCKER_IMAGE_NAME:$CI_COMMIT_TAG; fi
+
+stage:
+    stage: stage
+    dependencies: []
+    image:  my.repo/cimg/deploy:2024.03.1
+    rules:
+        - if: $CI_COMMIT_TAG # tagged commits are for production
+          when: on_success
+          variables:
+            KUSTOMIZE_FOLDER: kube/overlays/production
+            KUBE_NAMESPACE: production
+            VERSION: $CI_COMMIT_TAG
+        - if: $CI_COMMIT_BRANCH == $BRANCH_STAGING
+          when: on_success
+          variables:
+            KUSTOMIZE_FOLDER: kube/base
+            KUBE_NAMESPACE: staging
+            VERSION: latest
+        - when: never
+    script:
+        - echo $KUSTOMIZE_FOLDER
+        - echo $KUBE_NAMESPACE
+        - echo $VERSION
+        - kubectl kustomize $KUSTOMIZE_FOLDER > deploy.yaml
+        - envsubst < deploy.yaml | kubectl apply -f -
+        # - kubectl apply -k $KUSTOMIZE_FOLDER -n $KUBE_NAMESPACE
+        - kubectl rollout status deployment/$MODULE_NAME -n $KUBE_NAMESPACE --timeout=30s

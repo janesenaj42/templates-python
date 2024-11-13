@@ -1,0 +1,46 @@
+default_install_hook_types: [commit-msg, pre-commit]
+
+repos:
+    - repo: local
+      hooks:
+        - id: commitizen
+          name: commitizen check
+          language: python
+          stages: [commit-msg]
+          description: "Check whether commit message follows commiting rules"
+          entry: cz check --commit-msg-file
+
+        - id: ruff
+          name: ruff
+          language: python
+          stages: [pre-commit]
+          entry: ruff check
+          args: [ --fix ]
+          files: |
+            (?x)(
+            \.(py)$
+            )
+
+        - id: ruff-formatter
+          name: ruff-formatter
+          language: python
+          stages: [pre-commit]
+          entry: ruff formatter
+          files: |
+            (?x)(
+            \.(py)$
+            )
+
+        - id: pylint
+          name: pylint
+          language: python
+          stages: [pre-commit]
+          entry: pylint
+          args: [
+            src,
+            tests
+          ]
+          files: |
+            (?x)(
+            \.(py)$
+            )

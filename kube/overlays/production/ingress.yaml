@@ -1,0 +1,17 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+    name: my-package
+spec:
+    rules:
+        - host: sample.my.domain.prod
+          http:
+            paths:
+              - path: /
+                pathType: ImplementationSpecific
+                backend:
+                  service:
+                    name: my-package
+                    port:
+                      number: 8080

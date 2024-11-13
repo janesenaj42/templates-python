@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: default-test
+  finalizers:
+        - kubernetes.io/pvc-protection
+spec:
+  storageClassName: local-path
+  # NodePath only supports ReadWriteOnce and ReadWriteOncePod (1.22+) access modes
+  accessModes:
+    - ReadWriteOnce 
+  resources:
+    requests:
+      storage: 10Gi 

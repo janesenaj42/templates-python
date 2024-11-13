@@ -1,0 +1,48 @@
+[tool.poetry]
+name = "my_package"
+version = "0.2.0"
+description = "Sample python package"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+package-mode = false
+
+[[tool.poetry.source]]
+name = "private-repo"
+url = "http://my.private.repo/artifactory/api/pypi/pypi-public/simple"
+priority = "primary"
+
+[tool.poetry-exec-plugin.commands]
+start = "cd src && python -m my_package.main"
+lint = "ruff format . && ruff check --fix && pylint src tests"
+test = "python -m pytest"
+release = "cz bump && cz changelog"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.110.0"
+uvicorn = "^0.28.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+pre-commit = "^3.6.2"
+commitizen = "^3.18.0"
+radon = "^6.0.1"
+pylint = "^3.1.0"
+ruff = "^0.3.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+lint.select = ["I"]
+
+[tool.commitizen]
+version = "0.2.0"
+version_files = [
+	"pyproject.toml:version"
+]
+update_changelog_on_bump = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

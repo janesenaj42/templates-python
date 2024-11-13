@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: production
+commonLabels:
+    env: production
+resources:
+    - ../../base
+
+patches:
+    - path: ingress.yaml
+
+images:
+    - name: my.repo/sample/my-package
+      newTag: $VERSION

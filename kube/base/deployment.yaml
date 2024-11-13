@@ -1,0 +1,27 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: my-package
+spec:
+    replicas: 1
+    template:
+        spec:
+            containers:
+                - name: my-package
+                  securityContext: {}
+                  image: my.repo/sample/my-package:latest
+                  imagePullPolicy: Always
+                  ports:
+                    - name: http
+                      containerPort: 8080
+                  envFrom:
+                    - configMapRef:
+                        name: my-package
+                  volumeMounts:
+                    - name: volume-test
+                      mountPath: /data
+            volumes:
+                - name: volume-test
+                  persistentVolumeClaim:
+                    claimName: default-test

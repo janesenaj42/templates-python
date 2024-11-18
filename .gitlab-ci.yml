@@ -31,15 +31,17 @@ lint:
         PYLINT_REPORT_JSON: $REPORTS_DIRECTORY/pylint_report.json
     script:
         - mkdir -p $REPORTS_DIRECTORY
-        - python -m pylint --output-format=parseable $SRC_DIRECTORY > $PYLINT_REPORT
-        - python -m pylint --output-format=json $SRC_DIRECTORY > $PYLINT_REPORT_JSON
+        - python -m pylint --output-format=parseable $SRC_DIRECTORY | tee $PYLINT_REPORT || true
+        - python -m pylint --output-format=json $SRC_DIRECTORY > $PYLINT_REPORT_JSON || ERROR_CODE=$?
         - echo "Pylint done."
+        - exit $ERROR_CODE
     artifacts:
+        when: always
         paths:
             - $PYLINT_REPORT
             - $PYLINT_REPORT_JSON
 
-radon:
+complexity:
     stage: check
     extends:
         - .pip
@@ -50,9 +52,11 @@ radon:
     script:
         - mkdir -p $REPORTS_DIRECTORY
         - python -m radon cc $SRC_DIRECTORY > $RADON_REPORT
-        - python -m radon cc --xml --output-file $RADON_XML $SRC_DIRECTORY
+        - python -m radon cc --xml --output-file $RADON_XML $SRC_DIRECTORY #  for reporting
+        - python -m xenon --max-absolute=A --max-modules=A --max-average=A src # for monitoring
         - echo "Cyclomatic complexity done."
     artifacts:
+        when: always
         paths:
             - $RADON_REPORT
             - $RADON_XML
@@ -62,11 +66,23 @@ test:
     extends:
         - .pip
     dependencies: []
+    variables:
+        PYTEST_REPORT: $CI_PROJECT_DIR/$REPORTS_DIRECTORY/pytest.xml
     script:
-        - mkdir -p $REPORTS_DIRECTORY
+        - mkdir -p $CI_PROJECT_DIR/$REPORTS_DIRECTORY
         - cd $SRC_DIRECTORY
-        - python -m pytest ..
+        - python -m pytest .. --junitxml=$PYTEST_REPORT || ERROR_CODE=$?
+        - echo $ERROR_CODE
         - echo "Pytest done."
+        - |
+            if [ "$ERROR_CODE" -eq 5 ]; then
+                echo "No tests found."
+            else
+                exit $ERROR_CODE
+            fi
+    artifacts:
+        reports:
+            junit: $PYTEST_REPORT
 
 build:
     stage: build

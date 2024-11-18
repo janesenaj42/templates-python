@@ -1,5 +1,4 @@
 default_install_hook_types: [commit-msg, pre-commit]
-
 repos:
     - repo: local
       hooks:
@@ -36,10 +35,17 @@ repos:
           language: python
           stages: [pre-commit]
           entry: pylint
-          args: [
-            src,
-            tests
-          ]
+          files: |
+            (?x)(
+            \.(py)$
+            )
+
+        - id: xenon
+          name: xenon
+          language: python
+          stages: [pre-commit]
+          entry: xenon
+          args: ["--max-absolute=A", "--max-modules=A", "--max-average=A"]
           files: |
             (?x)(
             \.(py)$
